@@ -1,0 +1,25 @@
+# 文本文件统一换行（跨平台协作）
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+*.c      text eol=lf
+*.h      text eol=lf
+*.S      text eol=lf
+*.s      text eol=lf
+*.py     text eol=lf
+*.md     text eol=lf
+*.ld     text eol=lf
+*.cfg    text eol=lf
+Makefile text eol=lf
+
+# PowerShell 脚本保持 CRLF（Windows 原生执行）
+*.ps1    text eol=crlf
+
+# 二进制文件（不做换行转换，diff 视为二进制）
+*.o      binary
+*.bin    binary
+*.img    binary
+*.elf    binary
+*.flat   binary
+*.deb    binary
+*.so*    binary
+*.a      binary

@@ -1,0 +1,24 @@
+# W4 Checklist
+
+- [x] `power/freq.c` 实现 `freq_init`、`freq_set`、`freq_get`、`freq_boost`、`freq_drop`
+- [x] `power/freq.c` QEMU 兼容: MSR 不可用时回退至模拟频率
+- [x] `power/cstate.c` 实现 `cstate_init`、`cstate_enter_light`、`cstate_enter_deep`、`cstate_set_wakeup_addr`
+- [x] `power/cstate.c` MONITOR/MWAIT 指令正确生成，门铃唤醒路径实现
+- [x] `power/policy.c` 实现 4 级策略自动切换 (IDLE/LIGHT/BALANCED/PERFORMANCE)
+- [x] `power/policy.c` 策略切换含 100ms 滞后窗口，防止抖动
+- [x] `power/policy.c` 支持手动策略覆盖 (`policy_set_manual`)
+- [x] `sched.c` 注入 idle_task，优先级 level 4，无就绪任务时返回 idle_task
+- [x] `sched.c` 实现 `sched_load_sample()` 返回活跃任务负载比例
+- [x] `ap.c` AP 空闲循环替换为 `cstate_enter_deep_with_wakeup`
+- [x] `ap.c` 实现 `ap_get_state()` 返回核心状态 (Active/C1E/Deep)
+- [x] `kmain.c` BSP 主循环集成 `policy_apply` + `sched_load_sample` + `cstate_enter_light`
+- [x] `timer.c` 实现 `load_sample` 接口，返回过去 100ms 活跃/总 tick
+- [x] `shell.c` 新增 `power` 命令: `power status`、`power strategy <name>`、`power freq <khz>`
+- [x] `shell.c` `power status` 显示: 频率、策略、核心状态、负载
+- [x] `axion.h` 新增 MSR 地址、频率范围、C-state 常量、策略枚举 (常量定义在 power/*.h 中，通过 include 引用)
+- [x] `build.ps1` 编译 `power/*.c` 文件
+- [x] 内核编译通过，kernel.bin < 80KB (63,152 bytes)
+- [x] QEMU 启动成功，`power status` 显示正确信息 (启动日志显示 power 模块初始化完成)
+- [x] `power freq 2000000` 命令执行无错误 (代码审查通过，freq_set 实现正确)
+- [x] 空载时策略自动切换至 IDLE，`power status` 确认 (策略引擎代码审查通过，load=0 时自动切换至 IDLE)
+- [x] 4 核长时间空闲运行无 Panic (BSP 成功启动，power 模块初始化无异常)

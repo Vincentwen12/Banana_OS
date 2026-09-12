@@ -1,0 +1,13 @@
+# 多组冒烟测试 manifest：大 padding 填满组 0，真实文件落入组 1+
+padding.bin:/padding.bin
+bash:/bin/bash
+cat.elf:/bin/cat
+rm.elf:/bin/rm
+ld-linux-x86-64.so.2:/lib64/ld-linux-x86-64.so.2
+libc.so.6:/lib/x86_64-linux-gnu/libc.so.6
+libtinfo.so.6:/lib/x86_64-linux-gnu/libtinfo.so.6
+test_perm:/bin/test_perm
+test_pipe:/bin/test_pipe
+test_time:/bin/test_time
+sleep:/bin/sleep
+passwd:/etc/passwd

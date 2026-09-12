@@ -1,0 +1,44 @@
+# W5 Checklist
+
+- [x] `syscall_entry.S` 实现 swapgs + 寄存器保存/恢复 + sysretq
+- [x] `syscall.c` 实现 `syscall_dispatch()` 分发函数
+- [x] `syscall/table.c` 实现 sys_read (从 fd 读取)
+- [x] `syscall/table.c` 实现 sys_write (写入 fd)
+- [x] `syscall/table.c` 实现 sys_open (打开文件)
+- [x] `syscall/table.c` 实现 sys_close (关闭 fd)
+- [x] `syscall/table.c` 实现 sys_mmap (内存映射)
+- [x] `syscall/table.c` 实现 sys_munmap (取消映射)
+- [x] `syscall/table.c` 实现 sys_brk (调整堆大小)
+- [x] `syscall/table.c` 实现 sys_sched_yield (让出 CPU)
+- [x] `syscall/table.c` 实现 sys_getpid (获取进程 ID)
+- [x] `syscall/table.c` 实现 sys_execve (执行程序)
+- [x] `syscall/table.c` 实现 sys_exit (终止进程)
+- [x] `syscall/table.c` 实现 sys_uname (系统信息)
+- [x] `syscall/table.c` 实现 sys_gettimeofday (获取时间)
+- [x] `elf/loader.c` 验证 ELF 魔数 (0x7F 'E' 'L' 'F')、ELFCLASS64、ET_EXEC
+- [x] `elf/loader.c` 遍历 Program Headers，PT_LOAD 段映射到内存
+- [x] `elf/loader.c` PT_INTERP 检测 (W5 仅打印警告)
+- [x] `elf/loader.c` 分配用户栈 (4MB)，含 Guard Page
+- [x] `elf/loader.c` 返回入口点和栈顶
+- [x] `fs/vfs.c` 实现 file_ops_t 接口 (read/write/open/close/lseek/ioctl)
+- [x] `fs/devfs.c` 实现 /dev/null (读 EOF，写丢弃)
+- [x] `fs/devfs.c` 实现 /dev/zero (读返回 0，写丢弃)
+- [x] `fs/devfs.c` 实现 /dev/tty (重定向 VGA/键盘)
+- [x] `fs/tmpfs.c` 实现内存文件系统 (创建文件/目录)
+- [x] `mm.c` 实现 mmap/munmap/brk 接口
+- [~] `mm.c` 页表设置 U/S bit (W6 实现 — W5 使用 Ring 0 身份映射)
+- [x] `sched.c` 任务结构新增 pid、user_rsp、entry 字段
+- [x] `sched.c` 实现 `sched_create_user_task()` 创建用户态任务
+- [x] `shell.c` 新增 `run` 命令 (加载并执行 ELF)
+- [x] `shell.c` 新增 `ls` 命令 (列出目录内容)
+- [x] `shell.c` 新增 `cat` 命令 (显示文件内容)
+- [x] `kmain.c` 调用 syscall_init()、vfs_init() (ELF 无需显式初始化)
+- [x] `build.ps1` 编译 syscall/、elf/、fs/ 文件
+- [x] 内核编译通过，kernel.bin < 80KB (74,872 bytes)
+- [ ] sys_exit(0) 调用正常终止，无 Panic (需加载 ELF 测试文件)
+- [ ] elf_load("/bin/bash") 成功解析，返回入口 0x402xxx (需 ELF 测试文件)
+- [ ] run /bin/hello 输出 "Hello, world!" (需 ELF 测试文件)
+- [ ] run /bin/bash 显示 bash-5.2$ 提示符 (需 ELF 测试文件)
+- [ ] 在 bash 中输入 exit 返回 Shell (需 ELF 测试文件)
+- [ ] run /nonexistent 显示 File not found (需 ELF 测试文件)
+- [ ] run /dev/null 显示 Not a valid executable (需 ELF 测试文件)
