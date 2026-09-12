@@ -47,13 +47,16 @@ GNU Make, Python 3.10 and Vim all execute as user processes.
 │       ├── dev/              # ATA PIO block device
 │       └── net/              # loopback
 ├── tools/                    # rootfs fetch, EXT2 image builder, ELF generators
+├── docs/
+│   ├── engineering-log/      # post-mortems and fix reports per milestone
+│   └── specs/                # per-milestone specs / tasks / checklists
 ├── iso/grub/                 # GRUB config (legacy path, unused by build.ps1)
 ├── x86_64-elf/               # cross binutils   ← NOT in the repo, see below
-├── .trae/                    # design specs and fix reports (docs, not build)
 ├── linker.ld                 # kernel load address 0x100000, PVH note, sections
 ├── build.ps1                 # ← authoritative build & run script
 ├── clean_asm.ps1             # strips GCC-generated directives for the ELF assembler
-└── Makefile                  # early-stage build script (stale paths, see note)
+├── CONTRIBUTING.md           # how to build, test and submit changes
+└── CODE_OF_CONDUCT.md
 ```
 
 ### User/kernel address map
@@ -151,30 +154,38 @@ full interactive shell with job control.
 
 ## Tests
 
-The QEMU-driven regression scripts (`test_*.ps1`, `iso_*.ps1`, plus the image
-checkers `chk_fsimg*.py` / `verify_fs_state.py`) live in the local development
-tree and are **not** tracked by git — see `.gitignore`. They boot
-`disk.img` / `fs.img` under QEMU, drive the serial console and assert on the
-output, covering: fork/exec/ELF regression (10 consecutive
-`python3 -c "import ..."` runs), bash restart / login loop, toolchain
-availability (vim, gcc, make, tar, python3 REPL), `ls`/`cd` relative paths,
-pipes, and EXT2 image contents.
+Two regression scripts are tracked in this repository and drive QEMU over its
+serial console; the rest of the suite lives in the local development tree (see
+`.gitignore`).
 
 ```powershell
-# in the local development tree
-.\build.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1
+.\build.ps1                                                                  # build first
+powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1      # 10x python3 import - expect 10/10 ok
+powershell -NoProfile -ExecutionPolicy Bypass -File .\test_bash_restart.ps1  # bash exit/login loop - expect PASSED
 ```
+
+Both resolve QEMU from `$env:QEMU`, then `.\qemu-system-x86_64.exe`, then the
+default `D:\qemu\` path, and require `disk.img` / `fs.img` to have been built.
+`iso_s_imports.ps1` is the fork/exec/ELF regression gate (repeated
+`python3 -c "import ..."`); `test_bash_restart.ps1` proves the login loop
+respawns a working bash after `exit`.
 
 ---
 
 ## Design documents
 
-`.trae/documents/` and `.trae/specs/` hold the working specs and post-mortems
-for each milestone (W1 lightning boot → W7 userland toolchain), including the
-root-cause reports behind the trickier bugs (identity-map shadowing, `wait4`
-stack restoration, fd-table collisions, brk/mmap heap corruption). They are kept
-in the repository as the project's engineering log.
+[docs/engineering-log/](docs/engineering-log/) and [docs/specs/](docs/specs/)
+hold the working specs and post-mortems for each milestone (W1 lightning boot →
+W7 userland toolchain), including the root-cause reports behind the trickier
+bugs (identity-map shadowing, `wait4` stack restoration, fd-table collisions,
+brk/mmap heap corruption). They are kept in the repository as the project's
+engineering log.
+
+## Contributing
+
+Build/test setup, code conventions and the bug-report checklist live in
+[CONTRIBUTING.md](CONTRIBUTING.md). This project follows
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ---
 
@@ -187,9 +198,7 @@ in the repository as the project's engineering log.
 - **`mprotect` is a stub** — it returns success without changing page
   permissions; a few other syscalls are accepted no-ops for glibc's benefit.
 - **EXT2 is read-only** (write-side helpers exist for the kernel shell only).
-- **`Makefile` is stale**: it predates the module split (`src/kernel/mm/`,
-  `sched/`, ...) and points at old paths. Use `build.ps1`.
-- Test scripts hard-code the QEMU path `D:\qemu\`.
+- Test scripts default to the QEMU path `D:\qemu\`; override with `$env:QEMU`.
 
 ---
 

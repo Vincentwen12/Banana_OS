@@ -149,27 +149,34 @@ qemu-system-x86_64 -drive format=raw,file=disk.img \
 
 ## 测试
 
-QEMU 驱动的回归脚本（`test_*.ps1`、`iso_*.ps1`，以及镜像校验工具
-`chk_fsimg*.py` / `verify_fs_state.py`）位于本地开发目录，**不纳入版本库**
-—— 见 `.gitignore`。它们把 `disk.img` / `fs.img` 挂到 QEMU 上跑、通过串口下发
-命令并断言输出，覆盖：fork/exec/ELF 回归（连续 10 次
-`python3 -c "import ..."`）、bash 重启与登录循环、工具链可用性（vim、gcc、
-make、tar、python3 REPL）、`ls`/`cd` 相对路径、管道、EXT2 镜像内容。
+仓库内附带两个回归脚本，通过串口驱动 QEMU；其余测试脚本仅在本地开发目录
+（见 `.gitignore`）。
 
 ```powershell
-# 在本地开发目录中执行
-.\build.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1
+.\build.ps1                                                                  # 先构建
+powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1      # 10 次 python3 import — 期望 10/10 ok
+powershell -NoProfile -ExecutionPolicy Bypass -File .\test_bash_restart.ps1  # bash 退出/登录循环 — 期望 PASSED
 ```
+
+两个脚本按 `$env:QEMU` → `.\qemu-system-x86_64.exe` → 默认 `D:\qemu\` 的顺序
+定位 QEMU，并要求 `disk.img` / `fs.img` 已构建。`iso_s_imports.ps1` 是
+fork/exec/ELF 回归门禁（反复执行 `python3 -c "import ..."`）；
+`test_bash_restart.ps1` 验证 `exit` 后登录循环能重新拉起可用的 bash。
 
 ---
 
 ## 设计文档
 
-`.trae/documents/` 与 `.trae/specs/` 保存了各里程碑（W1 闪电启动 → W7 用户态
-工具链）的规格与复盘，包括若干疑难 bug 的根因报告（恒等映射被用户页遮蔽、
-`wait4` 栈恢复、fd 表冲突、brk/mmap 堆损坏等）。这些文档作为工程日志保留在
-仓库中。
+[docs/engineering-log/](docs/engineering-log/) 与 [docs/specs/](docs/specs/)
+保存了各里程碑（W1 闪电启动 → W7 用户态工具链）的规格与复盘，包括若干疑难
+bug 的根因报告（恒等映射被用户页遮蔽、`wait4` 栈恢复、fd 表冲突、brk/mmap
+堆损坏等）。这些文档作为工程日志保留在仓库中。
+
+## 参与贡献
+
+构建/测试环境、代码约定与 bug 报告清单见
+[CONTRIBUTING.md](CONTRIBUTING.md)；本项目遵循
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
 
 ---
 
@@ -181,9 +188,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1
 - **`mprotect` 为桩实现** —— 直接返回成功但不改变页权限；另有少数系统调用为
   兼容 glibc 的 no-op。
 - **EXT2 只读**（写侧辅助函数仅供内核 Shell 使用）。
-- **`Makefile` 已过时**：早于模块拆分（`src/kernel/mm/`、`sched/` 等），路径
-  失效。请使用 `build.ps1`。
-- 测试脚本硬编码 QEMU 路径 `D:\qemu\`。
+- 测试脚本默认使用 QEMU 路径 `D:\qemu\`，可用 `$env:QEMU` 覆盖。
 
 ---
 

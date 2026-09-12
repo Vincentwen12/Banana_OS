@@ -85,9 +85,11 @@
 /*.elf
 
 # -----------------------------------------------------------------------------
-# 6. 本地调试与测试脚本（本地保留，不入库）
-#    保留：build.ps1 / clean_asm.ps1 / make_disk.ps1、
-#          chk_fsimg.py / chk_fsimg2.py / verify_fs_state.py
+# 6. 本地调试与测试脚本
+#    入库：build.ps1 / clean_asm.ps1 / make_disk.ps1、
+#          chk_fsimg.py / chk_fsimg2.py / verify_fs_state.py、
+#          iso_s_imports.ps1 / test_bash_restart.ps1（两个核心回归脚本）
+#    其余测试/调试脚本仅本地保留，不入库
 # -----------------------------------------------------------------------------
 /diag*.ps1
 /dbg*.ps1
@@ -95,7 +97,9 @@
 /probe*.ps1
 /hexdump*.ps1
 /test_*.ps1
+!/test_bash_restart.ps1
 /iso_*.ps1
+!/iso_s_imports.ps1
 /tools/accept_wave1.ps1
 /tools/boot_check.ps1
 *.bak
