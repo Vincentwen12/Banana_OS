@@ -1,6 +1,7 @@
 # 文本文件统一换行（跨平台协作）
 .gitignore     text eol=lf
 .gitattributes text eol=lf
+LICENSE        text eol=lf
 *.c      text eol=lf
 *.h      text eol=lf
 *.S      text eol=lf

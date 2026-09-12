@@ -1,5 +1,7 @@
 # BananaOS-Axion (Axion-Ban)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 一个**从零自研的 x86-64 操作系统内核**：从手写的 BIOS 引导扇区启动，在自研
 EXT2 驱动与 Linux 兼容系统调用层之上运行**真实的 Ubuntu 用户态** —— GNU
 bash 5.2、coreutils、GCC 11、GNU Make、Python 3.10、Vim 都以用户进程身份运行。
@@ -186,9 +188,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1
 - **`Makefile` 已过时**：早于模块拆分（`src/kernel/mm/`、`sched/` 等），路径
   失效。请使用 `build.ps1`。
 - 测试脚本硬编码 QEMU 路径 `D:\qemu\`。
-- 尚未选定开源许可证 —— 公开仓库前请先补充。
 
 ---
+
+## 许可证
+
+本项目以 [MIT 许可证](LICENSE) 发布 —— © 2026 Vincentwen12。
+
+`fs.img` 中的 Ubuntu 用户态**不适用**本许可证，详见下方致谢。
 
 ## 致谢
 

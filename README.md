@@ -1,5 +1,7 @@
 # BananaOS-Axion (Axion-Ban)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A from-scratch **x86-64 operating system kernel** that boots from a hand-written
 BIOS boot sector and runs a **real Ubuntu userland** on top of its own EXT2
 driver and Linux-compatible syscall layer — GNU bash 5.2, coreutils, GCC 11,
@@ -190,9 +192,15 @@ in the repository as the project's engineering log.
 - **`Makefile` is stale**: it predates the module split (`src/kernel/mm/`,
   `sched/`, ...) and points at old paths. Use `build.ps1`.
 - Test scripts hard-code the QEMU path `D:\qemu\`.
-- No license has been chosen yet — add one before making the repository public.
 
 ---
+
+## License
+
+Released under the [MIT License](LICENSE) — © 2026 Vincentwen12.
+
+The Ubuntu userland shipped into `fs.img` is **not** covered by this license;
+see the acknowledgements below.
 
 ## Acknowledgements
 
