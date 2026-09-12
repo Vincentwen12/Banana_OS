@@ -1,4 +1,4 @@
-# BananaOS-Axion (Axion-Ban)
+# Banana_OS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
