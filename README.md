@@ -151,20 +151,18 @@ full interactive shell with job control.
 
 ## Tests
 
-All test scripts drive QEMU over the serial console and assert on its output.
-They expect QEMU at `D:\qemu\` and a freshly built `disk.img` / `fs.img`.
-
-| Script | What it checks |
-|---|---|
-| `iso_s_imports.ps1` | 10 consecutive `python3 -c "import ..."` runs — the fork/exec/ELF regression gate (expect 10/10 `ok`) |
-| `test_bash_restart.ps1` | bash exits → login loop restarts it; `ls` works in every cycle |
-| `test_shell_ux.ps1` | toolchain availability inside bash: vim, gcc, make, tar, python3 REPL |
-| `test_ls_cwd.ps1` | bare `ls`, repeated `ls`, `cd` + relative `ls`, relative `cat` |
-| `test_pyimport.ps1`, `test_pyrepl.ps1` | Python import and REPL behaviour |
-| `test_w7_fsimg.ps1`, `test_w7_long.ps1` | EXT2 image contents and long-run stability |
-| `test_regression.ps1`, `test_pipe.ps1`, `test_multig.ps1` | shell / pipe / multi-group smoke tests |
+The QEMU-driven regression scripts (`test_*.ps1`, `iso_*.ps1`, plus the image
+checkers `chk_fsimg*.py` / `verify_fs_state.py`) live in the local development
+tree and are **not** tracked by git — see `.gitignore`. They boot
+`disk.img` / `fs.img` under QEMU, drive the serial console and assert on the
+output, covering: fork/exec/ELF regression (10 consecutive
+`python3 -c "import ..."` runs), bash restart / login loop, toolchain
+availability (vim, gcc, make, tar, python3 REPL), `ls`/`cd` relative paths,
+pipes, and EXT2 image contents.
 
 ```powershell
+# in the local development tree
+.\build.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1
 ```
 

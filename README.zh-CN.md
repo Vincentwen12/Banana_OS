@@ -149,20 +149,16 @@ qemu-system-x86_64 -drive format=raw,file=disk.img \
 
 ## 测试
 
-所有测试脚本都通过串口驱动 QEMU 并对输出做断言，要求 QEMU 位于 `D:\qemu\`
-且 `disk.img` / `fs.img` 已构建。
-
-| 脚本 | 检查内容 |
-|---|---|
-| `iso_s_imports.ps1` | 连续 10 次 `python3 -c "import ..."` —— fork/exec/ELF 回归门禁（期望 10/10 `ok`） |
-| `test_bash_restart.ps1` | bash 退出后登录循环重启；每轮 `ls` 均可用 |
-| `test_shell_ux.ps1` | bash 内工具链可用性：vim、gcc、make、tar、python3 REPL |
-| `test_ls_cwd.ps1` | 裸 `ls`、重复 `ls`、`cd` + 相对 `ls`、相对 `cat` |
-| `test_pyimport.ps1`、`test_pyrepl.ps1` | Python 导入与 REPL 行为 |
-| `test_w7_fsimg.ps1`、`test_w7_long.ps1` | EXT2 镜像内容与长跑稳定性 |
-| `test_regression.ps1`、`test_pipe.ps1`、`test_multig.ps1` | Shell / 管道 / 多分组冒烟 |
+QEMU 驱动的回归脚本（`test_*.ps1`、`iso_*.ps1`，以及镜像校验工具
+`chk_fsimg*.py` / `verify_fs_state.py`）位于本地开发目录，**不纳入版本库**
+—— 见 `.gitignore`。它们把 `disk.img` / `fs.img` 挂到 QEMU 上跑、通过串口下发
+命令并断言输出，覆盖：fork/exec/ELF 回归（连续 10 次
+`python3 -c "import ..."`）、bash 重启与登录循环、工具链可用性（vim、gcc、
+make、tar、python3 REPL）、`ls`/`cd` 相对路径、管道、EXT2 镜像内容。
 
 ```powershell
+# 在本地开发目录中执行
+.\build.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1
 ```
 
