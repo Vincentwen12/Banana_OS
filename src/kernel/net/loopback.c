@@ -22,6 +22,7 @@
  * 缓冲区均在自身 .data/.bss 段，保证可映射。
  */
 #include "vfs.h"
+#include "loopback.h"
 
 #define AF_INET     2
 #define SOCK_STREAM 1
@@ -308,8 +309,8 @@ static uint64_t loop_close(void* file)
 /* ---- syscall 实现 ---- */
 
 /* 41: socket(domain=AF_INET(2), type=SOCK_STREAM(1), proto) */
-uint64_t sys_socket(uint64_t domain, uint64_t type, uint64_t proto,
-                    uint64_t a4, uint64_t a5, uint64_t a6)
+uint64_t loop_socket(uint64_t domain, uint64_t type, uint64_t proto,
+                     uint64_t a4, uint64_t a5, uint64_t a6)
 {
     (void)proto; (void)a4; (void)a5; (void)a6;
     if (domain != AF_INET) return (uint64_t)(-97);    /* EAFNOSUPPORT */
@@ -327,8 +328,8 @@ uint64_t sys_socket(uint64_t domain, uint64_t type, uint64_t proto,
 }
 
 /* 49: bind(fd, &sockaddr_in, len) — 仅 127.0.0.1，端口写入监听结构 */
-uint64_t sys_bind(uint64_t fd, uint64_t addr, uint64_t len,
-                  uint64_t a4, uint64_t a5, uint64_t a6)
+uint64_t loop_bind(uint64_t fd, uint64_t addr, uint64_t len,
+                   uint64_t a4, uint64_t a5, uint64_t a6)
 {
     (void)len; (void)a4; (void)a5; (void)a6;
     file_t* f = vfs_fd_get((int)fd);
@@ -358,8 +359,8 @@ uint64_t sys_bind(uint64_t fd, uint64_t addr, uint64_t len,
 }
 
 /* 50: listen(fd, backlog) — 置监听态（bind 已初始化待接受队列） */
-uint64_t sys_listen(uint64_t fd, uint64_t backlog,
-                    uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6)
+uint64_t loop_listen(uint64_t fd, uint64_t backlog,
+                     uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6)
 {
     (void)backlog; (void)a3; (void)a4; (void)a5; (void)a6;
     file_t* f = vfs_fd_get((int)fd);
@@ -372,8 +373,8 @@ uint64_t sys_listen(uint64_t fd, uint64_t backlog,
 
 /* 42: connect(fd, &sockaddr_in, len) — 同步立即完成：
  * 找到监听 socket，创建连接对，server 端点入队，返回 0 */
-uint64_t sys_connect(uint64_t fd, uint64_t addr, uint64_t len,
-                     uint64_t a4, uint64_t a5, uint64_t a6)
+uint64_t loop_connect(uint64_t fd, uint64_t addr, uint64_t len,
+                      uint64_t a4, uint64_t a5, uint64_t a6)
 {
     (void)len; (void)a4; (void)a5; (void)a6;
     file_t* f = vfs_fd_get((int)fd);
@@ -426,8 +427,8 @@ uint64_t sys_connect(uint64_t fd, uint64_t addr, uint64_t len,
 
 /* 43: accept(fd, addr_out, addrlen) — 队列非空则弹出并新建 server 端点 fd；
  * 空则有界轮询（loopback 场景 connect 先发生，通常直接命中） */
-uint64_t sys_accept(uint64_t fd, uint64_t addr_out, uint64_t addrlen,
-                    uint64_t a4, uint64_t a5, uint64_t a6)
+uint64_t loop_accept(uint64_t fd, uint64_t addr_out, uint64_t addrlen,
+                     uint64_t a4, uint64_t a5, uint64_t a6)
 {
     (void)addrlen; (void)a4; (void)a5; (void)a6;
     file_t* f = vfs_fd_get((int)fd);
@@ -471,8 +472,8 @@ uint64_t sys_accept(uint64_t fd, uint64_t addr_out, uint64_t addrlen,
 }
 
 /* 44: sendto(fd, buf, len, flags, addr, addrlen) — 退化为 send(=write) */
-uint64_t sys_sendto(uint64_t fd, uint64_t buf, uint64_t len, uint64_t flags,
-                    uint64_t addr, uint64_t addrlen)
+uint64_t loop_sendto(uint64_t fd, uint64_t buf, uint64_t len, uint64_t flags,
+                     uint64_t addr, uint64_t addrlen)
 {
     (void)flags; (void)addr; (void)addrlen;
     file_t* f = vfs_fd_get((int)fd);
@@ -481,8 +482,8 @@ uint64_t sys_sendto(uint64_t fd, uint64_t buf, uint64_t len, uint64_t flags,
 }
 
 /* 45: recvfrom(fd, buf, len, flags, addr, addrlen) — 退化为 recv(=read) */
-uint64_t sys_recvfrom(uint64_t fd, uint64_t buf, uint64_t len, uint64_t flags,
-                      uint64_t addr, uint64_t addrlen)
+uint64_t loop_recvfrom(uint64_t fd, uint64_t buf, uint64_t len, uint64_t flags,
+                       uint64_t addr, uint64_t addrlen)
 {
     (void)flags; (void)addr; (void)addrlen;
     file_t* f = vfs_fd_get((int)fd);
@@ -491,8 +492,8 @@ uint64_t sys_recvfrom(uint64_t fd, uint64_t buf, uint64_t len, uint64_t flags,
 }
 
 /* 48: shutdown(fd, how) — 置断开标志，释放连接（fd 保留） */
-uint64_t sys_shutdown(uint64_t fd, uint64_t how,
-                      uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6)
+uint64_t loop_shutdown(uint64_t fd, uint64_t how,
+                       uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6)
 {
     (void)how; (void)a3; (void)a4; (void)a5; (void)a6;
     file_t* f = vfs_fd_get((int)fd);

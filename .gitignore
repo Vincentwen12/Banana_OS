@@ -88,7 +88,7 @@
 # 6. 本地调试与测试脚本
 #    入库：build.ps1 / clean_asm.ps1 / make_disk.ps1、
 #          chk_fsimg.py / chk_fsimg2.py / verify_fs_state.py、
-#          iso_s_imports.ps1 / test_bash_restart.ps1（两个核心回归脚本）
+#          iso_s_imports.ps1 / test_bash_restart.ps1 / test_net.ps1（三个核心回归脚本）
 #    其余测试/调试脚本仅本地保留，不入库
 # -----------------------------------------------------------------------------
 /diag*.ps1
@@ -98,6 +98,7 @@
 /hexdump*.ps1
 /test_*.ps1
 !/test_bash_restart.ps1
+!/test_net.ps1
 /iso_*.ps1
 !/iso_s_imports.ps1
 /tools/accept_wave1.ps1
@@ -129,6 +130,8 @@ __pycache__/
 # -----------------------------------------------------------------------------
 # 9. 编辑器 / 系统噪声
 # -----------------------------------------------------------------------------
+# .trae/ 只存放 IDE 内的计划草稿；长期文档归档在 docs/specs/ 与 docs/engineering-log/
+/.trae/
 *.swp
 *~
 Thumbs.db

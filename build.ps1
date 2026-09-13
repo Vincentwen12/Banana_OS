@@ -51,7 +51,7 @@ function Build-Kernel {
         "src/kernel/syscall/signal.c", "src/kernel/syscall/shm.c",
         "src/kernel/net/net.c", "src/kernel/net/loopback.c",
         "src/kernel/net/rtl8139.c", "src/kernel/net/eth.c",
-        "src/kernel/net/ip.c", "src/kernel/net/udp.c",
+        "src/kernel/net/ip.c", "src/kernel/net/udp.c", "src/kernel/net/socket.c",
         "src/kernel/elf/loader.c", "src/kernel/elf/interp.c", "src/kernel/elf/hello_init.c",
         "src/kernel/fs/vfs.c", "src/kernel/fs/devfs.c", "src/kernel/fs/tmpfs.c",
         "src/kernel/fs/procfs.c", "src/kernel/fs/sysfs.c", "src/kernel/fs/pipe.c",

@@ -113,6 +113,7 @@ python tools/fetch_deps.py
 qemu-system-x86_64 -drive format=raw,file=disk.img \
                    -drive format=raw,file=fs.img \
                    -m 2G -nographic -no-shutdown \
+                   -device rtl8139,netdev=n0 -netdev user,id=n0 \
                    -smp 4,sockets=1,cores=4,threads=1 -machine pc,accel=tcg
 ```
 
@@ -140,28 +141,59 @@ qemu-system-x86_64 -drive format=raw,file=disk.img \
 
 `help` `hello` `mem` `alloc` `free` `clear` `reboot` `panic` `echo` `stats`
 `compress` `ps` `kill` `ipc` `power` `run` `jobs` `fg` `bg` `ls` `cat` `dmesg`
-`fsalloc` `fsfree` `wfile`
+`fsalloc` `fsfree` `wfile` `lspci` `ifconfig` `arp` `ping`
 
 启动完成后，内核把控制权交给 EXT2 盘上的 `/bin/bash`，得到带作业控制的完整
-交互式 Shell。
+交互式 Shell。`lspci` / `ifconfig` / `arp` / `ping` 属于内核 Shell：只有在没有
+前台程序运行时内核 Shell 才接管键盘，因此这四条命令需在 `/bin/bash` 无法加载
+的启动中使用（见 `test_net.ps1`）。
+
+---
+
+## 网络栈（W8）
+
+W8 加入 PCI 枚举、真实网卡驱动与 IPv4 协议栈，全部在无中断架构下运行——主循环
+轮询网卡，因此驱动是唯一的收包路径，阻塞式 socket 读必须主动让出 CPU。
+
+| 层次 | 源码 | 说明 |
+|---|---|---|
+| PCI 总线 | `src/kernel/dev/pci.{c,h}` | 通过 `0xCF8/0xCFC` 读配置空间，解析 BAR，驱动匹配表 |
+| 网卡驱动 | `src/kernel/net/rtl8139.{c,h}` | RTL8139（QEMU 默认网卡），PIO，4 个发送描述符，12 KB 接收环，轮询 |
+| 链路层 ARP | `src/kernel/net/eth.{c,h}` | Ethernet II，16 项 ARP 缓存，单个 pending 帧槽保证首个包不丢 |
+| IPv4 + ICMP | `src/kernel/net/ip.{c,h}` | 校验和验证、echo 请求/应答、ping 统计 |
+| UDP | `src/kernel/net/udp.{c,h}` | 8 个绑定 × 4 个数据报，通过 `WAIT_NET` 唤醒阻塞读 |
+| socket 分流 | `src/kernel/net/socket.c` | `AF_INET+SOCK_DGRAM` → UDP/网卡，`AF_INET+SOCK_STREAM` → 内存回环（127.0.0.1） |
+
+QEMU user-mode 网络把 guest 地址固定为 **10.0.2.15/24**、网关 **10.0.2.2**，
+这两个值硬编码在 `net_init()` 中。验证命令：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\test_net.ps1   # 期望 NET TEST PASSED
+```
+
+当前限制：仅 IPv4；TCP 不上线（仅回环）；不做分片重组（分片包直接丢弃并计数）；
+无 DHCP/DNS/netfilter；无中断与 DMA 映射层。
 
 ---
 
 ## 测试
 
-仓库内附带两个回归脚本，通过串口驱动 QEMU；其余测试脚本仅在本地开发目录
+仓库内附带三个回归脚本，通过串口驱动 QEMU；其余测试脚本仅在本地开发目录
 （见 `.gitignore`）。
 
 ```powershell
 .\build.ps1                                                                  # 先构建
 powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1      # 10 次 python3 import — 期望 10/10 ok
 powershell -NoProfile -ExecutionPolicy Bypass -File .\test_bash_restart.ps1  # bash 退出/登录循环 — 期望 PASSED
+powershell -NoProfile -ExecutionPolicy Bypass -File .\test_net.ps1           # PCI + 网卡 + ARP + ICMP — 期望 NET TEST PASSED
 ```
 
-两个脚本按 `$env:QEMU` → `.\qemu-system-x86_64.exe` → 默认 `D:\qemu\` 的顺序
+三个脚本按 `$env:QEMU` → `.\qemu-system-x86_64.exe` → 默认 `D:\qemu\` 的顺序
 定位 QEMU，并要求 `disk.img` / `fs.img` 已构建。`iso_s_imports.ps1` 是
 fork/exec/ELF 回归门禁（反复执行 `python3 -c "import ..."`）；
-`test_bash_restart.ps1` 验证 `exit` 后登录循环能重新拉起可用的 bash。
+`test_bash_restart.ps1` 验证 `exit` 后登录循环能重新拉起可用的 bash；
+`test_net.ps1` 跑两次启动（带/不带 `fs.img`），既验证 `net_init()` 不影响 bash
+登录路径，又驱动 `lspci` / `ifconfig` / `arp` / `ping 10.0.2.2`。
 
 ---
 

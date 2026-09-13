@@ -2469,7 +2469,10 @@ void syscall_table_init(void)
     syscall_register(31, sys_shmctl);
     syscall_register(67, sys_shmdt);
     /* [ANCHOR-NET] append net syscall registrations below (Wave 1, Agent C) */
-    /* ---- Task 3.3: loopback TCP (net/loopback.c) ---- */
+    /* ---- W6 loopback TCP + W8 UDP split (net/socket.c) ----
+     * AF_INET+SOCK_STREAM 分流到 loop_*（net/loopback.c，仅 127.0.0.1）；
+     * AF_INET+SOCK_DGRAM 分流到 UDP + RTL8139（net/udp.c）。
+     * syscall 编号与名字完全不变，用户态无感。 */
     extern uint64_t sys_socket(uint64_t a1, uint64_t a2, uint64_t a3,
                                uint64_t a4, uint64_t a5, uint64_t a6);
     extern uint64_t sys_connect(uint64_t a1, uint64_t a2, uint64_t a3,

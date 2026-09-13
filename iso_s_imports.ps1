@@ -24,7 +24,7 @@ foreach ($img in @($diskImg, $fsImg)) {
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $Qemu
-$psi.Arguments = "-drive format=raw,file=`"$diskImg`" -drive format=raw,file=`"$fsImg`" -m 2G -nographic -no-shutdown -smp 1 -machine pc,accel=tcg"
+$psi.Arguments = "-drive format=raw,file=`"$diskImg`" -drive format=raw,file=`"$fsImg`" -m 2G -nographic -no-shutdown -device rtl8139,netdev=n0 -netdev user,id=n0 -smp 1 -machine pc,accel=tcg"
 $psi.UseShellExecute = $false
 $psi.RedirectStandardInput = $true
 $psi.RedirectStandardOutput = $true

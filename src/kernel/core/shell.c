@@ -20,6 +20,12 @@
 #include "fs/ext2.h"
 #include "elf/loader.h"
 #include "gdt.h"
+#include "timer.h"
+#include "dev/pci.h"
+#include "net/net.h"
+#include "net/eth.h"
+#include "net/ip.h"
+#include "net/udp.h"
 
 #define MAX_CMDS    32
 #define ALLOC_TRACK 1024
@@ -62,6 +68,11 @@ static void cmd_dmesg(int argc, char** argv);
 static void cmd_fsalloc(int argc, char** argv);
 static void cmd_fsfree(int argc, char** argv);
 static void cmd_wfile(int argc, char** argv);
+static void cmd_lspci(int argc, char** argv);
+static void cmd_ifconfig(int argc, char** argv);
+static void cmd_arp(int argc, char** argv);
+static void cmd_ping(int argc, char** argv);
+static void cmd_udp(int argc, char** argv);
 
 /* Helper to register a single command */
 static void shell_register(const char* name, const char* desc, void (*func)(int, char**)) {
@@ -162,6 +173,11 @@ void shell_init(void) {
     shell_register("fsalloc",  "EXT2: alloc 1 inode + 1 block",        cmd_fsalloc);
     shell_register("fsfree",   "EXT2: free <ino> <blk>",               cmd_fsfree);
     shell_register("wfile",    "EXT2: wfile <path> <offset> <data>",   cmd_wfile);
+    shell_register("lspci",    "List PCI devices",                     cmd_lspci);
+    shell_register("ifconfig", "Show network interface & counters",    cmd_ifconfig);
+    shell_register("arp",      "Show ARP cache",                       cmd_arp);
+    shell_register("ping",     "ping <a.b.c.d> [count]",               cmd_ping);
+    shell_register("udp",      "udp send <ip> <port> [len] | udp stat", cmd_udp);
 }
 
 void shell_prompt(void) {
@@ -235,6 +251,231 @@ static void cmd_help(int argc, char** argv) {
 static void cmd_hello(int argc, char** argv) {
     (void)argc; (void)argv;
     vga_puts("Hello, world!\n");
+}
+
+/* ---- W8: 网络命令辅助 ---- */
+
+/* 大写 16 进制（PCI 惯例，便于与 lspci 输出比对） */
+static void print_hex_uc(uint64_t v, int digits) {
+    static const char H[] = "0123456789ABCDEF";
+    char buf[16];
+    if (digits > 16) digits = 16;
+    for (int i = digits - 1; i >= 0; i--) { buf[i] = H[v & 0xF]; v >>= 4; }
+    for (int i = 0; i < digits; i++) vga_putc(buf[i]);
+}
+
+static void cmd_lspci(int argc, char** argv) {
+    (void)argc; (void)argv;
+    int n = pci_count();
+    if (n == 0) { vga_puts("No PCI devices found\n"); return; }
+
+    for (int i = 0; i < n; i++) {
+        pci_device_t* d = pci_at(i);
+        if (!d) continue;
+        vga_puts("  ");
+        print_hex_uc(d->bus, 2);  vga_puts(":");
+        print_hex_uc(d->dev, 2);  vga_puts(".");
+        vga_puts(" ");
+        print_hex_uc(d->vendor, 4); vga_puts(":");
+        print_hex_uc(d->device, 4);
+        vga_puts("  class ");
+        print_hex_uc(d->class, 2); vga_puts(":");
+        print_hex_uc(d->subclass, 2);
+        if (d->bar_is_io[0]) {
+            vga_puts("  io=");
+            print_hex_uc(d->bar[0] & ~0x3u, 4);
+        } else if (d->bar[0] & ~0xFu) {
+            vga_puts("  mmio=");
+            print_hex_uc(d->bar[0] & ~0xFu, 8);
+        }
+        vga_puts("\n");
+    }
+    vga_puts("total: "); print_uint((uint64_t)n); vga_puts(" device(s)\n");
+}
+
+static void cmd_ifconfig(int argc, char** argv) {
+    (void)argc; (void)argv;
+    int n = net_device_count();
+    if (n == 0) {
+        vga_puts("no network device (start QEMU with -device rtl8139)\n");
+        return;
+    }
+    for (int i = 0; i < n; i++) {
+        net_device_t* d = net_device_at(i);
+        if (!d) continue;
+        char ips[16], gws[16], macs[18];
+        net_format_ip(d->ip, ips);
+        net_format_ip(d->gw, gws);
+        net_format_mac(d->mac, macs);
+
+        vga_puts(d->name); vga_puts(": flags=UP\n");
+        vga_puts("  ether "); vga_puts(macs); vga_puts("\n");
+        vga_puts("  inet "); vga_puts(ips); vga_puts("/24 gw "); vga_puts(gws); vga_puts("\n");
+        vga_puts("  RX packets "); print_uint(d->rx_packets);
+        vga_puts(" errors ");      print_uint(d->rx_errors);
+        vga_puts(" dropped ");     print_uint(d->rx_dropped); vga_puts("\n");
+        vga_puts("  TX packets "); print_uint(d->tx_packets);
+        vga_puts(" errors ");      print_uint(d->tx_errors); vga_puts("\n");
+    }
+}
+
+static void cmd_arp(int argc, char** argv) {
+    (void)argc; (void)argv;
+    int shown = 0;
+    vga_puts("Address          HWaddress\n");
+    for (int i = 0; i < ARP_TABLE_SIZE; i++) {
+        uint32_t ip = 0;
+        uint8_t  mac[ETH_ALEN];
+        uint64_t age = 0;
+        if (!arp_entry_at(i, &ip, mac, &age)) continue;
+        char ips[16], macs[18];
+        net_format_ip(ip, ips);
+        net_format_mac(mac, macs);
+        vga_puts("  "); vga_puts(ips);
+        vga_puts("   "); vga_puts(macs);
+        vga_puts("  age="); print_uint(age / 1000); vga_puts("s\n");
+        shown++;
+    }
+    if (!shown) vga_puts("  (empty)\n");
+    vga_puts("entries: "); print_uint((uint64_t)shown); vga_puts("\n");
+}
+
+static void cmd_ping(int argc, char** argv) {
+    if (argc < 2) { vga_puts("Usage: ping <a.b.c.d> [count]\n"); return; }
+    if (!net_is_ready()) { vga_puts("no network device\n"); return; }
+
+    int ok = 0;
+    uint32_t dst = net_parse_ip(argv[1], &ok);
+    if (!ok) { vga_puts("invalid address\n"); return; }
+
+    int n = (argc >= 3) ? atoi_s(argv[2]) : 4;
+    if (n <= 0 || n > 10) n = 4;
+
+    icmp_reset_stats();
+    vga_puts("PING "); vga_puts(argv[1]); vga_puts("\n");
+
+    for (int i = 0; i < n; i++) {
+        icmp_send_ping(dst);
+        uint64_t t0 = timer_ms();
+        while (timer_ms() - t0 < 500) {
+            /* 内核 shell 命令运行在主循环里，会阻塞主循环 → 必须自己收包 */
+            net_poll();
+            uint64_t sent = 0, recv = 0;
+            icmp_stats(&sent, &recv, NULL, NULL, NULL);
+            if (recv >= (uint64_t)(i + 1)) break;
+            __asm__ volatile("pause");
+        }
+    }
+
+    uint64_t sent = 0, recv = 0, unreach = 0, last = 0, total = 0;
+    icmp_stats(&sent, &recv, &unreach, &last, &total);
+
+    vga_puts("  "); print_uint(sent); vga_puts(" sent, ");
+    print_uint(recv); vga_puts(" received, ");
+    print_uint(sent > recv ? (sent - recv) * 100 / sent : 0); vga_puts("% loss\n");
+    vga_puts("  rtt avg "); print_uint(recv ? total / recv : 0); vga_puts(" ms\n");
+    vga_puts("  "); print_uint(recv); vga_puts("/"); print_uint(sent);
+    vga_puts(" replies\n");
+}
+
+/* udp send <a.b.c.d> <port> [len] | udp stat
+ *
+ * 端到端自测：先在本地 bind 目标同号端口。udp_send() 的简化实现把源端口设为
+ * 目的端口，因此对端回包会回到该端口；发包后自己 poll 最多 1s 取回包。
+ * 内核 shell 命令运行在主循环里会阻塞主循环，必须像 cmd_ping 一样自收包。 */
+static void cmd_udp(int argc, char** argv)
+{
+    if (argc < 2) {
+        vga_puts("Usage: udp send <a.b.c.d> <port> [len] | udp stat\n");
+        return;
+    }
+
+    if (strcmp_s(argv[1], "stat") == 0) {
+        uint64_t rx = 0, tx = 0, dropped = 0, unreach = 0;
+        udp_stats(&rx, &tx, &dropped);
+        icmp_stats(NULL, NULL, &unreach, NULL, NULL);
+        vga_puts("UDP rx ");     print_uint(rx);
+        vga_puts(" tx ");        print_uint(tx);
+        vga_puts(" dropped ");   print_uint(dropped); vga_puts("\n");
+        vga_puts("ICMP unreach "); print_uint(unreach); vga_puts("\n");
+        return;
+    }
+
+    if (strcmp_s(argv[1], "send") != 0 || argc < 4) {
+        vga_puts("Usage: udp send <a.b.c.d> <port> [len] | udp stat\n");
+        return;
+    }
+    if (!net_is_ready()) { vga_puts("no network device\n"); return; }
+
+    int ok = 0;
+    uint32_t dst = net_parse_ip(argv[2], &ok);
+    if (!ok) { vga_puts("invalid address\n"); return; }
+
+    int port = atoi_s(argv[3]);
+    if (port <= 0 || port > 65535) { vga_puts("invalid port\n"); return; }
+
+    int len = (argc >= 5) ? atoi_s(argv[4]) : 8;
+    if (len < 8 || len > 64) len = 8;
+
+    if (!udp_is_bound((uint16_t)port))
+        udp_bind((uint16_t)port, 0);
+
+    /* 可识别负载：前 8 字节固定 "BANANAUD"，其余填 0x42 */
+    uint8_t payload[64];
+    static const char tag[8] = { 'B', 'A', 'N', 'A', 'N', 'A', 'U', 'D' };
+    for (int i = 0; i < 64; i++)
+        payload[i] = (i < 8) ? (uint8_t)tag[i] : 0x42;
+
+    char ips[16];
+    net_format_ip(dst, ips);
+
+    uint64_t tx0 = 0, rx0 = 0, drop0 = 0;
+    udp_stats(&rx0, &tx0, &drop0);
+
+    vga_puts("UDP send "); vga_puts(ips); vga_putc(':');
+    print_uint((uint64_t)port);
+    vga_puts(" len="); print_uint((uint64_t)len); vga_puts("\n");
+
+    if (udp_send(dst, (uint16_t)port, payload, (uint32_t)len) != 0)
+        vga_puts("  send failed\n");
+    else
+        vga_puts("  tx ok\n");
+
+    uint8_t  buf[64];
+    uint32_t from_ip = 0;
+    uint16_t from_port = 0;
+    int n = 0;
+    uint64_t t0 = timer_ms();
+    while (timer_ms() - t0 < 1000) {
+        net_poll();                  /* 让主循环之外也能收包 */
+        n = udp_recv((uint16_t)port, buf, (int)sizeof(buf), &from_ip, &from_port);
+        if (n > 0) break;
+        __asm__ volatile("pause");
+    }
+
+    if (n > 0) {
+        char fip[16];
+        net_format_ip(from_ip, fip);
+        vga_puts("  reply "); print_uint((uint64_t)n);
+        vga_puts(" bytes from "); vga_puts(fip); vga_putc(':');
+        print_uint((uint64_t)from_port); vga_puts("\n");
+        vga_puts("  data=");
+        int shown = (n < 8) ? n : 8;
+        for (int i = 0; i < shown; i++) {
+            char c = (char)buf[i];
+            vga_putc((c >= ' ' && c <= '~') ? c : '.');
+        }
+        vga_puts("\n");
+    } else {
+        vga_puts("  no reply in 1000 ms\n");
+    }
+
+    uint64_t tx1 = 0, rx1 = 0, drop1 = 0, unreach = 0;
+    udp_stats(&rx1, &tx1, &drop1);
+    icmp_stats(NULL, NULL, &unreach, NULL, NULL);
+    vga_puts("  udp tx="); print_uint(tx1 - tx0);
+    vga_puts(" rx=");      print_uint(rx1 - rx0);
+    vga_puts(" icmp unreach="); print_uint(unreach); vga_puts("\n");
 }
 
 static void cmd_mem(int argc, char** argv) {

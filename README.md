@@ -117,6 +117,7 @@ Under the hood step 4 runs:
 qemu-system-x86_64 -drive format=raw,file=disk.img \
                    -drive format=raw,file=fs.img \
                    -m 2G -nographic -no-shutdown \
+                   -device rtl8139,netdev=n0 -netdev user,id=n0 \
                    -smp 4,sockets=1,cores=4,threads=1 -machine pc,accel=tcg
 ```
 
@@ -145,10 +146,41 @@ The built-in kernel shell (`src/kernel/core/shell.c`) provides:
 
 `help` `hello` `mem` `alloc` `free` `clear` `reboot` `panic` `echo` `stats`
 `compress` `ps` `kill` `ipc` `power` `run` `jobs` `fg` `bg` `ls` `cat` `dmesg`
-`fsalloc` `fsfree` `wfile`
+`fsalloc` `fsfree` `wfile` `lspci` `ifconfig` `arp` `ping`
 
 After booting, the kernel hands over to `/bin/bash` from the EXT2 disk, giving a
-full interactive shell with job control.
+full interactive shell with job control. `lspci` / `ifconfig` / `arp` / `ping`
+belong to the kernel shell, which only owns the keyboard while no foreground
+program is running — so they are used from a boot where `/bin/bash` cannot be
+loaded (see `test_net.ps1`).
+
+---
+
+## Network stack (W8)
+
+W8 adds PCI enumeration, a real NIC driver and an IPv4 stack that all run
+without interrupts — the main loop polls the card, so the driver is the only
+receive path and blocking socket reads must yield the CPU.
+
+| Layer | Source | Notes |
+|---|---|---|
+| PCI bus | `src/kernel/dev/pci.{c,h}` | config space via `0xCF8/0xCFC`, BAR decoding, driver match table |
+| NIC driver | `src/kernel/net/rtl8139.{c,h}` | RTL8139 (QEMU default), PIO, 4 TX descriptors, 12 KB RX ring, polling |
+| Ethernet + ARP | `src/kernel/net/eth.{c,h}` | Ethernet II, 16-entry ARP cache, single pending-frame slot so the first packet is not lost |
+| IPv4 + ICMP | `src/kernel/net/ip.{c,h}` | checksum verification, echo request/reply, ping statistics |
+| UDP | `src/kernel/net/udp.{c,h}` | 8 binds x 4 datagrams, wakes a blocked reader through `WAIT_NET` |
+| socket split | `src/kernel/net/socket.c` | `AF_INET+SOCK_DGRAM` → UDP/NIC, `AF_INET+SOCK_STREAM` → in-memory loopback (127.0.0.1) |
+
+QEMU user-mode networking fixes the guest address at **10.0.2.15/24** with
+gateway **10.0.2.2**; those values are hard-coded in `net_init()`. Verified by:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\test_net.ps1   # expect NET TEST PASSED
+```
+
+Current limits: IPv4 only, no TCP over the wire (loopback only), no fragment
+reassembly (fragmented packets are dropped and counted), no DHCP/DNS/netfilter,
+no interrupts or DMA-mapping layer.
 
 ---
 
@@ -162,13 +194,16 @@ serial console; the rest of the suite lives in the local development tree (see
 .\build.ps1                                                                  # build first
 powershell -NoProfile -ExecutionPolicy Bypass -File .\iso_s_imports.ps1      # 10x python3 import - expect 10/10 ok
 powershell -NoProfile -ExecutionPolicy Bypass -File .\test_bash_restart.ps1  # bash exit/login loop - expect PASSED
+powershell -NoProfile -ExecutionPolicy Bypass -File .\test_net.ps1           # PCI + NIC + ARP + ICMP - expect NET TEST PASSED
 ```
 
 Both resolve QEMU from `$env:QEMU`, then `.\qemu-system-x86_64.exe`, then the
 default `D:\qemu\` path, and require `disk.img` / `fs.img` to have been built.
 `iso_s_imports.ps1` is the fork/exec/ELF regression gate (repeated
 `python3 -c "import ..."`); `test_bash_restart.ps1` proves the login loop
-respawns a working bash after `exit`.
+respawns a working bash after `exit`; `test_net.ps1` runs two QEMU boots (with
+and without `fs.img`) to cover `net_init()` alongside the bash login path and
+then `lspci` / `ifconfig` / `arp` / `ping 10.0.2.2`.
 
 ---
 
