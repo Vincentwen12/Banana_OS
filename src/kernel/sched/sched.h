@@ -38,6 +38,7 @@ typedef struct kctx {
 #define WAIT_TIME    6   /* nanosleep，arg = 唤醒时刻 ms */
 #define WAIT_SELECT  7   /* poll/select，arg = 0（主循环重新扫描 fd） */
 #define WAIT_SIGTIMED 8  /* rt_sigtimedwait，arg = 唤醒时刻 ms */
+#define WAIT_NET     9   /* W8 UDP 收：等待数据报，arg = 本地端口号（主机序） */
 
 /* Task structure */
 typedef struct task {

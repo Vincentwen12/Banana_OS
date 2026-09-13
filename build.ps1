@@ -49,12 +49,14 @@ function Build-Kernel {
         "src/kernel/power/freq.c", "src/kernel/power/cstate.c", "src/kernel/power/policy.c",
         "src/kernel/syscall/syscall.c", "src/kernel/syscall/table.c",
         "src/kernel/syscall/signal.c", "src/kernel/syscall/shm.c",
-        "src/kernel/net/loopback.c",
+        "src/kernel/net/net.c", "src/kernel/net/loopback.c",
+        "src/kernel/net/rtl8139.c", "src/kernel/net/eth.c",
+        "src/kernel/net/ip.c", "src/kernel/net/udp.c",
         "src/kernel/elf/loader.c", "src/kernel/elf/interp.c", "src/kernel/elf/hello_init.c",
         "src/kernel/fs/vfs.c", "src/kernel/fs/devfs.c", "src/kernel/fs/tmpfs.c",
         "src/kernel/fs/procfs.c", "src/kernel/fs/sysfs.c", "src/kernel/fs/pipe.c",
         "src/kernel/fs/ext2.c",
-        "src/kernel/dev/ata.c"
+        "src/kernel/dev/ata.c", "src/kernel/dev/pci.c"
     )
 
     # 汇编 boot.S (64-bit)
@@ -210,6 +212,10 @@ function Invoke-Clean {
     Remove-Item src/kernel/elf/*.tmp.s -Force -ErrorAction SilentlyContinue
     Remove-Item src/kernel/fs/*.o -Force -ErrorAction SilentlyContinue
     Remove-Item src/kernel/fs/*.tmp.s -Force -ErrorAction SilentlyContinue
+    Remove-Item src/kernel/dev/*.o -Force -ErrorAction SilentlyContinue
+    Remove-Item src/kernel/dev/*.tmp.s -Force -ErrorAction SilentlyContinue
+    Remove-Item src/kernel/net/*.o -Force -ErrorAction SilentlyContinue
+    Remove-Item src/kernel/net/*.tmp.s -Force -ErrorAction SilentlyContinue
     Remove-Item kernel.bin, kernel.flat, bootsect.bin, disk.img -Force -ErrorAction SilentlyContinue
     Remove-Item ap_trampoline.bin, ap_trampoline_embed.o -Force -ErrorAction SilentlyContinue
     Write-Host "[OK] Clean done" -ForegroundColor Green
@@ -226,19 +232,19 @@ switch ($Target) {
     "run" {
         Build-Kernel
         Write-Host "[QEMU] Running (nographic)..." -ForegroundColor Cyan
-        & $QEMU -drive format=raw,file=disk.img -drive format=raw,file=fs.img -m 2G -nographic -no-shutdown -smp 4,sockets=1,cores=4,threads=1 -machine pc,accel=tcg
+        & $QEMU -drive format=raw,file=disk.img -drive format=raw,file=fs.img -m 2G -nographic -no-shutdown -device rtl8139,netdev=n0 -netdev user,id=n0 -smp 4,sockets=1,cores=4,threads=1 -machine pc,accel=tcg
         break
     }
     "run-gui" {
         Build-Kernel
         Write-Host "[QEMU] Running (GUI)..." -ForegroundColor Cyan
-        & $QEMU -drive format=raw,file=disk.img -drive format=raw,file=fs.img -m 2G -smp 2,sockets=1,cores=2,threads=1 -machine pc,accel=tcg
+        & $QEMU -drive format=raw,file=disk.img -drive format=raw,file=fs.img -m 2G -device rtl8139,netdev=n0 -netdev user,id=n0 -smp 2,sockets=1,cores=2,threads=1 -machine pc,accel=tcg
         break
     }
     "debug" {
         Build-Kernel
         Write-Host "[QEMU] Debug mode (waiting on :1234)..." -ForegroundColor Cyan
-        & $QEMU -drive format=raw,file=disk.img -drive format=raw,file=fs.img -m 2G -nographic -no-reboot -s -S -smp 2,sockets=1,cores=2,threads=1 -machine pc,accel=tcg
+        & $QEMU -drive format=raw,file=disk.img -drive format=raw,file=fs.img -m 2G -nographic -no-reboot -device rtl8139,netdev=n0 -netdev user,id=n0 -s -S -smp 2,sockets=1,cores=2,threads=1 -machine pc,accel=tcg
         break
     }
     default {

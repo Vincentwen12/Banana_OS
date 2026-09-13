@@ -26,6 +26,8 @@
 #include "fs/sysfs.h"
 #include "elf/loader.h"
 #include "dev/ata.h"
+#include "dev/pci.h"
+#include "net/net.h"
 #include "fs/ext2.h"
 #include "gdt.h"
 
@@ -200,6 +202,9 @@ void kmain(uint32_t magic, void* multiboot_info) {
     printk(KERN_INFO, "[INIT] Initializing boomerang pool...\n");
     boomerang_init();
 
+    printk(KERN_INFO, "[INIT] Enumerating PCI bus...\n");
+    pci_init();
+
     printk(KERN_INFO, "[INIT] Initializing ATA block device...\n");
     ata_init();
     {
@@ -225,6 +230,11 @@ void kmain(uint32_t magic, void* multiboot_info) {
 
     printk(KERN_INFO, "[INIT] Initializing devfs...\n");
     devfs_init();
+
+    /* W8: PCI 已在上方枚举；这里做驱动 probe 与默认地址配置。
+     * 无网卡时打印一行并返回，后续所有 net_* 入口都是安全空操作。 */
+    printk(KERN_INFO, "[INIT] Initializing network...\n");
+    net_init();
 
     printk(KERN_INFO, "[INIT] Initializing tmpfs...\n");
     tmpfs_init();
@@ -490,6 +500,9 @@ void kmain(uint32_t magic, void* multiboot_info) {
         if (doorbell_poll(0)) {
             /* Process IPC on channel 0 */
         }
+        /* W8: 网卡轮询。无中断架构下这是唯一的收包点：用户任务必须阻塞
+         * 让出（如 socket 阻塞读走 WAIT_NET）才会回到这里。无网卡时空操作。 */
+        net_poll();
         sched_tick();
 
         /* 6) 空载省电 */
